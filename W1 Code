@@ -1,0 +1,189 @@
+# Loading a pacakge
+import pandas as pd
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+import plotly.graph_objs as go
+import plotly.figure_factory as ff
+from plotly import tools
+from plotly.offline import download_plotlyjs, init_notebook_mode, plot, iplot
+init_notebook_mode(connected=True)
+
+import gc
+from datetime import datetime
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold
+from sklearn.metrics import roc_auc_score
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import AdaBoostClassifier
+from catboost import CatBoostClassifier
+from sklearn import svm
+import lightgbm as lgb
+from lightgbm import LGBMClassifier
+import xgboost as xgb
+
+pd.set_option('display.max_columns', 100)
+
+RFC_METRIC = 'gini'  #metric used for RandomForrestClassifier
+NUM_ESTIMATORS = 100 #number of estimators used for RandomForrestClassifier
+NO_JOBS = 4 #number of parallel jobs used for RandomForrestClassifier
+
+#TRAIN/VALIDATION/TEST SPLIT
+#VALIDATION
+VALID_SIZE = 0.20 # simple validation using train_test_split
+TEST_SIZE = 0.20 # test size using_train_test_split
+
+#CROSS-VALIDATION
+NUMBER_KFOLDS = 5 #number of KFolds for cross-validation
+
+RANDOM_STATE = 2018
+
+MAX_ROUNDS = 1000 #lgb iterations
+EARLY_STOP = 50 #lgb early stop
+OPT_ROUNDS = 1000  #To be adjusted based on best validation rounds
+VERBOSE_EVAL = 50 #Print out metric result
+
+IS_LOCAL = False
+import os
+for dirname, _, filenames in os.walk('/kaggle/input'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+
+# You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All"
+# You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+
+#Reading data
+data_df = pd.read_csv("creditcard.csv")
+
+
+#Check data
+print("Credit Card Fraud Detection data -  rows:",data_df.shape[0]," columns:", data_df.shape[1])
+
+
+#overview of data
+data_df.head()
+
+
+#Quick look at the summary statistic
+data_df.describe().round(2)
+'''
+There are 284807 transactions during 2 consecuritve days
+Mean Transaction amount is 88.35
+'''
+
+#Check missing data
+total = data_df.isnull().sum().sort_values(ascending = False)
+percent = (data_df.isnull().sum()/data_df.isnull().count()*100).sort_values(ascending = False)
+pd.concat([total, percent], axis=1, keys=['Total', 'Percent']).transpose()
+
+#Check if the data is unbalance
+# simple seaborn countplot
+ax = sns.countplot(x='Class', data=data_df)
+ax.bar_label(ax.containers[0])
+plt.show()
+'''
+Only 492 (or 0.172%) of transaction are fraudulent. That means the data is highly unbalanced with respect with target variable Class.
+'''
+
+#Transaction in time
+# Splitting the data
+class_0 = data_df.loc[data_df['Class'] == 0]["Time"]
+class_1 = data_df.loc[data_df['Class'] == 1]["Time"]
+
+# Creating a Seaborn KDE plot
+plt.figure(figsize=(10, 6))
+sns.kdeplot(class_0, label='Not Fraud', shade=True)
+sns.kdeplot(class_1, label='Fraud', shade=True)
+
+# Adding titles and labels
+plt.title('Credit Card Transactions Time Density Plot')
+plt.xlabel('Time [s]')
+plt.ylabel('Density')
+plt.legend()
+
+# Display the plot
+plt.show()
+
+
+#Observation of the time distribution of transactions
+data_df['Hour'] = data_df['Time'].apply(lambda x: np.floor(x / 3600))
+
+tmp = data_df.groupby(['Hour', 'Class'])['Amount'].aggregate(['min', 'max', 'count', 'sum', 'mean', 'median', 'var']).reset_index()
+df = pd.DataFrame(tmp)
+df.columns = ['Hour', 'Class', 'Min', 'Max', 'Transactions', 'Sum', 'Mean', 'Median', 'Var']
+df.head()
+
+
+#Transaction amount
+fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(12,6))
+s = sns.boxplot(ax = ax1, x="Class", y="Amount", hue="Class",data=data_df, palette="PRGn",showfliers=True)
+s = sns.boxplot(ax = ax2, x="Class", y="Amount", hue="Class",data=data_df, palette="PRGn",showfliers=False)
+plt.show();
+
+
+#Class 0 describe
+tmp = data_df[['Amount','Class']].copy()
+class_0 = tmp.loc[tmp['Class'] == 0]['Amount']
+class_1 = tmp.loc[tmp['Class'] == 1]['Amount']
+class_0.describe()
+
+
+#Class 1
+class_1.describe()
+
+
+#Amount of Fraudulent Transaction
+# Filter data for fraudulent transactions
+fraud = data_df.loc[data_df['Class'] == 1]
+
+# Create the scatter plot using Seaborn
+plt.figure(figsize=(10, 6))
+sns.scatterplot(
+    x=fraud['Time'],
+    y=fraud['Amount'],
+    color='red',
+    alpha=0.5
+)
+
+# Add titles and labels
+plt.title('Amount of Fraudulent Transactions')
+plt.xlabel('Time [s]')
+plt.ylabel('Amount')
+
+# Display the plot
+plt.show()
+
+
+#Credit Card Transactions features correlation plot (Pearson
+plt.figure(figsize = (14,14))
+plt.title('Credit Card Transactions features correlation plot (Pearson)')
+corr = data_df.corr()
+sns.heatmap(corr,xticklabels=corr.columns,yticklabels=corr.columns,linewidths=.1,cmap="Reds")
+plt.show()
+'''
+ere is no notable correlation between features V1-V28. There are certain correlations between 
+some of these features and Time (inverse correlation with V3) and Amount (direct correlation 
+with V7 and V20, inverse correlation with V1 and V5).
+'''
+
+
+# correlation {V20;Amount} and {V7;Amount}
+s = sns.lmplot(x='V20', y='Amount',data=data_df, hue='Class', fit_reg=True,scatter_kws={'s':2})
+s = sns.lmplot(x='V7', y='Amount',data=data_df, hue='Class', fit_reg=True,scatter_kws={'s':2})
+plt.show()
+'''
+two couples of features are correlated (the regression lines for Class = 0 have a positive slope, 
+whilst the regression line for Class = 1 have a smaller positive slope).
+'''
+
+#inverse correlation values
+s = sns.lmplot(x='V2', y='Amount',data=data_df, hue='Class', fit_reg=True,scatter_kws={'s':2})
+s = sns.lmplot(x='V5', y='Amount',data=data_df, hue='Class', fit_reg=True,scatter_kws={'s':2})
+plt.show()
+'''
+We can confirm that the two couples of features are inverse correlated (the regression lines 
+for Class = 0 have a negative slope while the regression lines for Class = 1 have a very small \
+negative slope).
+'''

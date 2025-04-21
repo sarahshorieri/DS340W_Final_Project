@@ -10,5 +10,16 @@ This project implements a comprehensive fraud detection system using machine lea
 - Comprehensive Evaluation: Includes multiple metrics (Accuracy, Precision, Recall, F1, ROC-AUC, PR-AUC) and visualizations
 - Feature Engineering: Calculates transaction distances and extracts temporal features
 
+### Instruction to run the code
+1. Download the .ipynb file from github.
+2. Download the dataset from the Kaggle link below.
+3. Open the .ipynb file in Google Colab
+4. Move the dataset file into the .ipynb file.
+5. Cross-check the name of file is same as the .ipynb file.
+6. Change runtime type to Python 3.
+7. Change the hardware accelarator to v2-8 TPU (recommended).
+8. Run the code.
+  
+
 ### Dataset Source 
 https://www.kaggle.com/datasets/priyamchoksi/credit-card-transactions-dataset
